@@ -14,30 +14,30 @@ struct SensitivityAnalysisSourceTerm
   static inline ordinal_type getWorkSpaceSize(
     const KineticModelConstDataType& kmcd)
   {
-    return Impl::SensitivityAnalysisSourceTerm::getWorkSpaceSize(kmcd);
+    return Impl::SensitivityAnalysisSourceTerm::getWorkSpaceSize(kmcd) + kmcd.nSpec + 1;
   }
 
-  //
   static void runDeviceBatch( /// input
     typename UseThisTeamPolicy<exec_space>::type& policy,
     const real_type_2d_view& state,
+    const real_type_1d_view& alpha,
     /// output
     const real_type_2d_view& SourceTerm,
     const real_type_2d_view& facL,
     const real_type_2d_view& facF,
-
     /// const data from kinetic model
     const KineticModelConstDataDevice& kmcd);
   //
-  static void runHostBatch( /// input
-    typename UseThisTeamPolicy<host_exec_space>::type& policy,
-    const real_type_2d_view_host& state,
-    /// output
-    const real_type_2d_view_host& SourceTerm,
-    const real_type_2d_view_host& facL,
-    const real_type_2d_view_host& facF,
-    /// const data from kinetic model
-    const KineticModelConstDataHost& kmcd);
+  // static void runHostBatch( /// input
+  //   typename UseThisTeamPolicy<host_exec_space>::type& policy,
+  //   const real_type_2d_view_host& state,
+  //   const real_type_1d_view_host& alpha,
+  //   /// output
+  //   const real_type_2d_view_host& SourceTerm,
+  //   const real_type_2d_view_host& facL,
+  //   const real_type_2d_view_host& facF,
+  //   /// const data from kinetic model
+  //   const KineticModelConstDataHost& kmcd);
 
 };
 

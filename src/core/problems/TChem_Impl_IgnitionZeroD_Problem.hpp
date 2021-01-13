@@ -30,6 +30,8 @@ Sandia National Laboratories, Livermore, CA, USA
 #include "TChem_Impl_NumericalJacobianForwardDifference.hpp"
 #include "TChem_Impl_NumericalJacobianRichardsonExtrapolation.hpp"
 
+#define TCHEM_ENABLE_PROBLEMS_NUMERICAL_JACOBIAN
+
 namespace TChem {
 namespace Impl {
 
@@ -130,7 +132,8 @@ struct IgnitionZeroD_Problem
                                               const RealType1DViewType& f) const
   {
     const real_type t = x(0);
-    const real_type_1d_view_type Ys(&x(1), _kmcd.nSpec);
+    //const real_type_1d_view_type Ys(&x(1), _kmcd.nSpec);
+    const RealType1DViewType Ys(&x(1), _kmcd.nSpec);
     Impl::SourceTerm::team_invoke(member, t, _p, Ys, f, _work, _kmcd);
     member.team_barrier();
   }

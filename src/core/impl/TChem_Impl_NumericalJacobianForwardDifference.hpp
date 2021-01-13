@@ -20,7 +20,7 @@ Sandia National Laboratories, Livermore, CA, USA
 ===================================================================================== */
 #ifndef __TCHEM_IMPL_NUMERICAL_JACOBIAN_FORWARD_DIFFERENCE_HPP__
 #define __TCHEM_IMPL_NUMERICAL_JACOBIAN_FORWARD_DIFFERENCE_HPP__
-
+#define TCHEM_ENABLE_SERIAL_TEST_OUTPUT
 namespace TChem {
 namespace Impl {
 ///
@@ -55,11 +55,13 @@ struct NumericalJacobianForwardDifference
     const real_type fac_min_use = fac_min <= zero ? (eps_3_4) : fac_min;
     const real_type fac_max_use = fac_max <= zero ? (eps_2_1_2) : fac_max;
 
-    /// J should be square
+
     const ordinal_type m = J.extent(0);
+    const ordinal_type n = J.extent(1);
+
 
     /// initialization fac if necessary
-    Kokkos::parallel_for(Kokkos::TeamVectorRange(member, m),
+    Kokkos::parallel_for(Kokkos::TeamVectorRange(member, n),
                          [&](const ordinal_type& i) {
                            fac(i) = (fac(i) == zero ? eps_1_2 : fac(i));
                          });
@@ -67,7 +69,7 @@ struct NumericalJacobianForwardDifference
     problem.computeFunction(member, x, f_0);
 
     /// loop over columns
-    for (ordinal_type j = 0; j < m; ++j) {
+    for (ordinal_type j = 0; j < n; ++j) {
       /// keep x at i
       const real_type x_at_j = x(j);
 
@@ -152,6 +154,46 @@ struct NumericalJacobianForwardDifference
       }
 
     }
+
+//
+#if defined(TCHEM_ENABLE_SERIAL_TEST_OUTPUT) && !defined(__CUDA_ARCH__)
+    if (member.league_rank() == 0) {
+      FILE* fs = fopen("NumericalJacobianForwardDifference.team_invoke.test.out", "a+");
+      fprintf(fs, ":: NumericalJacobianForwardDifference::team_invoke\n");
+      fprintf(fs, ":::: input\n");
+      fprintf(fs, "m %d n %d \n", m, n);
+      fprintf(fs, "x \n");
+      for (ordinal_type sp = 0; sp < x.extent(0); sp++) {
+        fprintf(fs,"i %d % e \n", sp, x(sp) );
+      }
+      fprintf(fs, "fac \n");
+      for (ordinal_type sp = 0; sp < fac.extent(0); sp++) {
+        fprintf(fs,"i %d % e \n", sp, fac(sp) );
+      }
+      fprintf(fs, ":::: output\n");
+      fprintf(fs, "f_0 \n");
+      for (ordinal_type sp = 0; sp < f_0.extent(0); sp++) {
+        fprintf(fs,"i %d % e \n", sp, f_0(sp) );
+      }
+      fprintf(fs, "f_h \n");
+      for (ordinal_type sp = 0; sp < f_h.extent(0); sp++) {
+        fprintf(fs,"i %d % e \n", sp, f_h(sp) );
+      }
+      fprintf(fs, "J\n");
+      for (int i = 0; i < int(J.extent(0)); ++i){
+        for (int j = 0; j < int(J.extent(1)); j++) {
+          fprintf(fs,"%e ",J(i,j) );
+        }
+        fprintf(fs,"\n");
+      }
+
+
+
+
+
+    }
+#endif
+
   }
 
   template<typename MemberType,
@@ -172,6 +214,8 @@ struct NumericalJacobianForwardDifference
     RealType1DViewType f_0(wptr, m);
     wptr += f_0.span();
     RealType1DViewType f_h(wptr, m);
+
+
 
     team_invoke_detail(member, problem, fac_min, fac_max, fac, x, f_0, f_h, J);
   }

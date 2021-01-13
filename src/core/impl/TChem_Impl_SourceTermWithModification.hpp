@@ -197,6 +197,7 @@ struct SourceTermWithModification
     auto omega_s = RealType1DViewType(omega.data() + 1, kmcd.nSpec);
 
     team_invoke_detail(member,
+                       alpha,
                        t,
                        p,
                        Ys,

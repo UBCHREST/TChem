@@ -29,6 +29,7 @@ Sandia National Laboratories, Livermore, CA, USA
 #include "TChem_Util.hpp"
 #include "TChem_Impl_ForcingAndJacobianMatrix.hpp"
 
+#define TCHEM_ENABLE_SERIAL_TEST_OUTPUT
 namespace TChem {
 namespace Impl {
 
@@ -38,17 +39,11 @@ struct SensitivityAnalysisSourceTerm
   KOKKOS_INLINE_FUNCTION static ordinal_type getWorkSpaceSize(
     const KineticModelConstDataType& kmcd)
   {
-    const ordinal_type workspace_size = (5 * kmcd.nSpec + 8 * kmcd.nReac);
+    const ordinal_type workspace_size = (kmcd.nSpec *kmcd.nSpec
+      + kmcd.nSpec*kmcd.nReac + ForcingAndJacobianMatrix::getWorkSpaceSize(kmcd));
     return workspace_size;
   }
 
-  ///
-  ///  \param t  : temperature [K]
-  ///  \param Xc : array of \f$N_{spec}\f$ doubles \f$((XC_1,XC_2,...,XC_N)\f$:
-  ///              molar concentrations XC \f$[kmol/m^3]\f$
-  ///  \return omega : array of \f$N_{spec}\f$ molar reaction rates
-  ///  \f$\dot{\omega}_i\f$ \f$\left[kmol/(m^3\cdot s)\right]\f$
-  ///
   template<typename MemberType,
            typename RealType1DViewType,
            typename RealType2DViewType,
@@ -58,6 +53,7 @@ struct SensitivityAnalysisSourceTerm
     /// input
     const real_type& p,
     const RealType1DViewType& vals, /// (kmcd.nSpec)
+    const RealType1DViewType& alpha,
     // outputs
     const RealType1DViewType& source,
     /// workspace
@@ -74,14 +70,18 @@ struct SensitivityAnalysisSourceTerm
     ForcingAndJacobianMatrix::team_invoke(member,
                                        p,
                                        vals,
+                                       alpha,
                                        facL,
                                        facF,
                                        L,
                                        F,
                                        w,
                                        kmcd);
-
     member.team_barrier();
+
+
+
+
   }
 
   template<typename MemberType,
@@ -93,6 +93,7 @@ struct SensitivityAnalysisSourceTerm
     /// input
     const real_type& p,
     const RealType1DViewType& vals, /// (kmcd.nSpec)
+    const RealType1DViewType& alpha,
     /// output
     const RealType1DViewType& source, /// (kmcd.nSpec + 1)
     const RealType1DViewType& facL,
@@ -110,22 +111,28 @@ struct SensitivityAnalysisSourceTerm
     auto L = Kokkos::View<real_type**,
                              Kokkos::LayoutRight,
                              typename WorkViewType::memory_space>(
-      w, kmcd.nSpec, kmcd.nReac);
-    w += kmcd.nReac *kmcd.nReac;
+      w, kmcd.nSpec, kmcd.nSpec);
+    w += kmcd.nSpec *kmcd.nSpec;
 
     auto F = Kokkos::View<real_type**,
                              Kokkos::LayoutRight,
                              typename WorkViewType::memory_space>(
-      w, kmcd.nSpec, kmcd.nSpec);
+      w, kmcd.nSpec, kmcd.nReac);
 
-    w += kmcd.nSpec*kmcd.nSpec;
+    w += kmcd.nSpec*kmcd.nReac;
 
-    auto workFL = RealType1DViewType(w, kmcd.nSpec);
-    w += kmcd.nSpec;
+    const ordinal_type workspace_used(w - work.data()),
+      workspace_extent(work.extent(0));
+    if (workspace_used > workspace_extent) {
+      Kokkos::abort("Error: workspace used is larger than it is provided\n");
+    }
 
-      team_invoke_detail(member,
+    auto workFL = RealType1DViewType(w, workspace_extent - workspace_used);
+
+    team_invoke_detail(member,
                        p,
                        vals,
+                       alpha,
                        source,
                        /// workspace
                        facL,
@@ -134,8 +141,45 @@ struct SensitivityAnalysisSourceTerm
                        F,
                        workFL,
                        kmcd);
+
+//
+#if defined(TCHEM_ENABLE_SERIAL_TEST_OUTPUT) && !defined(__CUDA_ARCH__)
+    if (member.league_rank() == 0) {
+      FILE* fs = fopen("SensitivityAnalysisSourceTerm.team_invoke.test.out", "a+");
+      fprintf(fs, ":: SensitivityAnalysisSourceTerm::team_invoke\n");
+      fprintf(fs, ":::: input\n");
+      fprintf(fs,
+              "     nSpec %3d, nReac %3d, t %e, p %e\n",
+              kmcd.nSpec,
+              kmcd.nReac,
+              vals(0),
+              p);
+      fprintf(fs, "mass fraction :: input\n");
+      for (ordinal_type sp = 1; sp < kmcd.nSpec+1; sp++) {
+        fprintf(fs,"sp %d % e \n", sp, vals(sp) );
+      }
+      fprintf(fs, "L :: output\n");
+      for (int i = 0; i < int(L.extent(0)); ++i){
+        for (int j = 0; j < int(L.extent(1)); j++) {
+          fprintf(fs,"%e ",L(i,j) );
+        }
+        fprintf(fs,"\n");
+      }
+
+      fprintf(fs, "F :: output\n");
+      for (int i = 0; i < int(F.extent(0)); ++i){
+        for (int j = 0; j < int(F.extent(1)); j++) {
+          fprintf(fs,"%e ",F(i,j) );
+        }
+        fprintf(fs,"\n");
+      }
+
+    }
+#endif
   }
 };
+
+
 
 } // namespace Impl
 } // namespace TChem

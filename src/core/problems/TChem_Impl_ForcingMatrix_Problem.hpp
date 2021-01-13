@@ -29,6 +29,8 @@ Sandia National Laboratories, Livermore, CA, USA
 #include "TChem_Impl_NumericalJacobianForwardDifference.hpp"
 #include "TChem_Impl_NumericalJacobianRichardsonExtrapolation.hpp"
 
+#define TCHEM_ENABLE_SERIAL_TEST_OUTPUT
+
 namespace TChem {
 namespace Impl {
 
@@ -145,12 +147,44 @@ struct ForcingMatrix_Problem
 
     /// use the default values
     const real_type fac_min(-1), fac_max(-1);
-    // NumericalJacobianForwardDifference::team_invoke_detail
-    //  (member, *this, fac_min, fac_max, _fac, x, f_0, f_h, J);
+    NumericalJacobianForwardDifference::team_invoke_detail
+     (member, *this, fac_min, fac_max, _fac, x, f_0, f_h, J);
     // NumericalJacobianCentralDifference::team_invoke_detail(
     //   member, *this, fac_min, fac_max, _fac, x, f_0, f_h, J);
-    NumericalJacobianRichardsonExtrapolation::team_invoke_detail
-     (member, *this, fac_min, fac_max, _fac, x, f_0, f_h, J);
+    // NumericalJacobianRichardsonExtrapolation::team_invoke_detail
+    //  (member, *this, fac_min, fac_max, _fac, x, f_0, f_h, J);
+
+
+    #if defined(TCHEM_ENABLE_SERIAL_TEST_OUTPUT) && !defined(__CUDA_ARCH__)
+        if (member.league_rank() == 0) {
+          FILE* fs = fopen("ForcingMatrix_Problem.team_invoke.test.out", "a+");
+          fprintf(fs, ":: ForcingMatrix_Problem::team_invoke\n");
+          fprintf(fs, ":::: input\n");
+          fprintf(fs,
+                  "     nSpec %3d, nReac %3d, t %e, p %e\n",
+                  _kmcd.nSpec,
+                  _kmcd.nReac,
+                  _temp,
+                  _p);
+          fprintf(fs, "x :: input\n");
+          for (ordinal_type sp = 1; sp < x.extent(0); sp++) {
+            fprintf(fs,"i %d % e \n", sp, x(sp) );
+          }
+          fprintf(fs, "mass fraction :: input\n");
+          for (ordinal_type sp = 0; sp < _Ys.extent(0); sp++) {
+            fprintf(fs,"i %d % e \n", sp, _Ys(sp) );
+          }
+
+          fprintf(fs, "F :: output\n");
+          for (int i = 0; i < int(J.extent(0)); ++i){
+            for (int j = 0; j < int(J.extent(1)); j++) {
+              fprintf(fs,"%e ",J(i,j) );
+            }
+            fprintf(fs,"\n");
+          }
+
+        }
+    #endif
 
   }
 };

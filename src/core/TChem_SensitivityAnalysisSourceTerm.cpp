@@ -10,13 +10,14 @@ namespace TChem {
   void
   SensitivityAnalysisSourceTerm_TemplateRun( /// input
     const std::string& profile_name,
-    const RealType1DViewType& dummy_1d,
+
     /// team size setting
     const PolicyType& policy,
     const RealType2DViewType& state,
+    const RealType1DViewType& alpha,
+    const RealType2DViewType& SourceTerm,
     const RealType2DViewType& facL,
     const RealType2DViewType& facF,
-    const RealType2DViewType& SourceTerm,
     const KineticModelConstType& kmcd
   )
   {
@@ -33,11 +34,9 @@ namespace TChem {
         const ordinal_type i = member.league_rank();
         const RealType1DViewType facL_at_i =
           Kokkos::subview(facL, i, Kokkos::ALL());
-        //
         const RealType1DViewType facF_at_i =
           Kokkos::subview(facF, i, Kokkos::ALL());
-        const RealType1DViewType facM_at_i =
-          Kokkos::subview(facF, i, Kokkos::ALL());
+
         const RealType1DViewType state_at_i =
           Kokkos::subview(state, i, Kokkos::ALL());
 
@@ -68,8 +67,8 @@ namespace TChem {
                                vals(i) = i == 0 ? temperature : Ys(i - 1);
                              });
 
-        Impl::SensitivityAnalysisSourceTerm ::team_invoke(member, pressure, vals,
-           SourceTerm_at_i, facL_at_i, facF_at_i, work, kmcd);
+        Impl::SensitivityAnalysisSourceTerm::team_invoke(member, pressure, vals,
+               alpha, SourceTerm_at_i, facL_at_i, facF_at_i, ww, kmcd);
 
       });
     Kokkos::Profiling::popRegion();
@@ -81,6 +80,7 @@ void
 SensitivityAnalysisSourceTerm::runDeviceBatch( /// input
   typename UseThisTeamPolicy<exec_space>::type& policy,
   const real_type_2d_view& state,
+  const real_type_1d_view& alpha,
   /// output
   const real_type_2d_view& SourceTerm,
   const real_type_2d_view& facL,
@@ -88,13 +88,12 @@ SensitivityAnalysisSourceTerm::runDeviceBatch( /// input
   /// const data from kinetic model
   const KineticModelConstDataDevice& kmcd)
 {
-
   SensitivityAnalysisSourceTerm_TemplateRun( /// input
     "TChem::TChem_SensitivityAnalysisSourceTerm::runDeviceBatch",
-    real_type_1d_view(),
     /// team size setting
     policy,
     state,
+    alpha,
     SourceTerm,
     facL,
     facF,
@@ -102,30 +101,31 @@ SensitivityAnalysisSourceTerm::runDeviceBatch( /// input
 
 }
 
-void
-SensitivityAnalysisSourceTerm::runHostBatch( /// input
-  typename UseThisTeamPolicy<host_exec_space>::type& policy,
-  const real_type_2d_view_host& state,
-  /// output
-  const real_type_2d_view_host& SourceTerm,
-  const real_type_2d_view_host& facL,
-  const real_type_2d_view_host& facF,
-  /// const data from kinetic model
-  const KineticModelConstDataHost& kmcd)
-{
-
-  SensitivityAnalysisSourceTerm_TemplateRun( /// input
-    "TChem::SourceTermToyProblem::runHostBatch",
-    real_type_1d_view_host(),
-    /// team size setting
-    policy,
-    state,
-    SourceTerm,
-    facL,
-    facF,
-    kmcd);
-
-}
+  // void
+  // SensitivityAnalysisSourceTerm::runHostBatch( /// input
+  //   typename UseThisTeamPolicy<host_exec_space>::type& policy,
+  //   const real_type_2d_view_host& state,
+  //   const real_type_1d_view_host& alpha,
+  //   /// output
+  //   const real_type_2d_view_host& SourceTerm,
+  //   const real_type_2d_view_host& facL,
+  //   const real_type_2d_view_host& facF,
+  //   /// const data from kinetic model
+  //   const KineticModelConstDataHost& kmcd)
+  // {
+  //
+  //   SensitivityAnalysisSourceTerm_TemplateRun( /// input
+  //     "TChem::SourceTermToyProblem::runHostBatch",
+  //     /// team size setting
+  //     policy,
+  //     state,
+  //     alpha,
+  //     SourceTerm,
+  //     facL,
+  //     facF,
+  //     kmcd);
+  //
+  // }
 
 
 } // namespace TChem

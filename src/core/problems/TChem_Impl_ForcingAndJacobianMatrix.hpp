@@ -40,7 +40,19 @@ struct ForcingAndJacobianMatrix
     problem_type problem;
     problem._kmcd = kmcd;
 
-    // return TimeIntegrator::getWorkSpaceSize(problem);
+    const ordinal_type problem_workspace_size =
+      problem_type::getWorkSpaceSize(kmcd);
+
+    //
+    using problem_type_forcing =
+      TChem::Impl::ForcingMatrix_Problem<KineticModelConstDataType>;
+    problem_type_forcing problem_forcing;
+    problem_forcing._kmcd = kmcd;
+
+    const ordinal_type problem_workspace_size_forcing =
+      problem_type_forcing::getWorkSpaceSize(kmcd);
+
+    return problem_workspace_size + problem_workspace_size_forcing + kmcd.nReac;
   }
 
   template<typename MemberType,
@@ -52,6 +64,7 @@ struct ForcingAndJacobianMatrix
     const MemberType& member,
     const real_type& pressure,      /// pressure
     const RealType1DViewType& vals, /// mass fraction (kmcd.nSpec)
+    const RealType1DViewType& alpha,
     const RealType1DViewType& facL, /// numerica jacobian percentage
     const RealType1DViewType& facF, /// numerica jacobian percentage
     //output
@@ -62,71 +75,122 @@ struct ForcingAndJacobianMatrix
     /// const input from kinetic model
     const KineticModelConstDataType& kmcd)
   {
-    real_type one(1);
 
-    using problem_type_jac =
-      TChem::Impl::IgnitionZeroD_Problem<KineticModelConstDataType>;
-    problem_type_jac problem_jac;
+     auto wptr = work.data();
+    {
+      using problem_type_jac =
+        TChem::Impl::IgnitionZeroD_Problem<KineticModelConstDataType>;
+      problem_type_jac problem_jac;
 
-    /// problem workspace
-    const ordinal_type problem_workspace_size =
-      problem_type_jac::getWorkSpaceSize(kmcd);
-    auto wptr = work.data();
-    auto pw = typename problem_type_jac::real_type_1d_view_type(
-      wptr, problem_workspace_size);
-    wptr += problem_workspace_size;
+      /// problem workspace
+      const ordinal_type problem_workspace_size =
+        problem_type_jac::getWorkSpaceSize(kmcd);
 
-    /// initialize problem
-    problem_jac._p = pressure; // pressure
-    problem_jac._work = pw;    // problem workspace array
-    problem_jac._kmcd = kmcd;  // kinetic model
-    problem_jac._fac = facL;    // fac for numerical jacobian
+      auto pw = RealType1DViewType(
+        wptr, problem_workspace_size);
+      wptr += problem_workspace_size;
 
-    //computes jacobian
-    problem_jac.computeJacobian(member,vals,L);
+      /// initialize problem
+      problem_jac._p = pressure; // pressure
+      problem_jac._work = pw;    // problem workspace array
+      problem_jac._kmcd = kmcd;  // kinetic model
+      problem_jac._fac = facL;    // fac for numerical jacobian
 
-    using problem_type_forcing =
-      TChem::Impl::ForcingMatrix_Problem<KineticModelConstDataType>;
-    problem_type_forcing problem_forcing;
+      problem_jac.computeJacobian(member, vals, L);
 
-    /// problem workspace
-    const ordinal_type problem_workspace_size_forcing =
-      problem_type_forcing::getWorkSpaceSize(kmcd);
 
-    //
-    auto pwL = typename problem_type_forcing::real_type_1d_view_type(
-      wptr, problem_workspace_size_forcing);
-    wptr += problem_workspace_size_forcing;
 
-    //
-    auto alpha = RealType1DViewType(wptr, kmcd.nReac);
-    wptr += kmcd.nReac;
-
-    Kokkos::parallel_for(Kokkos::TeamVectorRange(member, kmcd.nSpec),
-                         [&](const ordinal_type& i) { alpha(i) = one; });
-    /// error check
-    const ordinal_type workspace_used(wptr - work.data()),
-      workspace_extent(work.extent(0));
-    if (workspace_used > workspace_extent) {
-      Kokkos::abort("Error: workspace used is larger than it is provided\n");
+      //computes jacobian
+        // {
+        //   const ordinal_type m = problem_jac.getNumberOfEquations();
+        //   /// _work is used for evaluating a function
+        //   /// f_0 and f_h should be gained from the tail
+        //   real_type* wptr = problem_jac._work.data() + (problem_jac._work.span() - 2 * m);
+        //   RealType1DViewType f_0(wptr, m);
+        //   wptr += f_0.span();
+        //   RealType1DViewType f_h(wptr, m);
+        //   wptr += f_h.span();
+        //
+        //   /// use the default values
+        //   const real_type fac_min(-1), fac_max(-1);
+        //   // NumericalJacobianForwardDifference::team_invoke_detail
+        //   //  (member, problem, fac_min, fac_max, fac, x, f_0, f_h, Jac);
+        //   // NumericalJacobianCentralDifference::team_invoke_detail(
+        //   //   member, problem, fac_min, fac_max, fac, x, f_0, f_h, Jac);
+        //   NumericalJacobianRichardsonExtrapolation::team_invoke_detail
+        //    (member, problem_jac, fac_min, fac_max, facL, vals, f_0, f_h, L);
+        //
+        //
+        // }
     }
 
-    /// initialize problem
-    problem_forcing._p = pressure; // pressure
-    problem_forcing._temp = vals(0);
-    for (ordinal_type i = 0; i < kmcd.nSpec; i++) {
-      problem_forcing._Ys(i) = vals(1+i);
+    {
+      using problem_type_forcing =
+        TChem::Impl::ForcingMatrix_Problem<KineticModelConstDataType>;
+      problem_type_forcing problem_forcing;
+
+      /// problem workspace
+      const ordinal_type problem_workspace_size_forcing =
+        problem_type_forcing::getWorkSpaceSize(kmcd);
+
+      //
+      auto pwL = RealType1DViewType(
+        wptr, problem_workspace_size_forcing);
+      wptr += problem_workspace_size_forcing;
+
+      //
+      // const auto alpha = RealType1DViewType(wptr, kmcd.nReac);
+      // wptr += kmcd.nReac;
+
+      // Kokkos::parallel_for(Kokkos::TeamVectorRange(member, kmcd.nSpec),
+      //                      [&](const ordinal_type& i) { alpha(i) = one; });
+      /// error check
+
+      const ordinal_type workspace_used(wptr - work.data()),
+        workspace_extent(work.extent(0));
+      if (workspace_used > workspace_extent) {
+        Kokkos::abort("Error: workspace used is larger than it is provided\n");
+      }
+
+      /// initialize problem
+      problem_forcing._p = pressure; // pressure
+      problem_forcing._temp = vals(0);
+
+      problem_forcing._Ys = RealType1DViewType(&vals(1), kmcd.nSpec);
+
+      problem_forcing._work = pwL;    // problem workspace array
+      problem_forcing._kmcd = kmcd;  // kinetic model
+      problem_forcing._fac = facF;    // fac for numerical jacobian
+
+      problem_forcing.computeJacobian(member, alpha, F);
+
+      // {
+      //   const ordinal_type m = problem_forcing.getNumberOfEquations();
+      //   /// _work is used for evaluating a function
+      //   /// f_0 and f_h should be gained from the tail
+      //   real_type* wptr = problem_forcing._work.data() + (problem_forcing._work.span() - 2 * m);
+      //   RealType1DViewType f_0(wptr, m);
+      //   wptr += f_0.span();
+      //   RealType1DViewType f_h(wptr, m);
+      //   wptr += f_h.span();
+      //
+      //   /// use the default values
+      //   const real_type fac_min(-1), fac_max(-1);
+      //   NumericalJacobianForwardDifference::team_invoke_detail
+      //    (member, problem_forcing, fac_min, fac_max, facF, alpha, f_0, f_h, F);
+      //   // NumericalJacobianCentralDifference::team_invoke_detail(
+      //   //   member, problem, fac_min, fac_max, fac, x, f_0, f_h, Jac);
+      //   // NumericalJacobianRichardsonExtrapolation::team_invoke_detail
+      //   //  (member, problem_forcing, fac_min, fac_max, facF, alpha, f_0, f_h, F);
+      //
+      //
+      // }
+
     }
-    problem_forcing._work = pwL;    // problem workspace array
-    problem_forcing._kmcd = kmcd;  // kinetic model
-    problem_forcing._fac = facF;    // fac for numerical jacobian
-
-    /// problem workspace
-    const ordinal_type problem_workspace_size_F =
-      problem_type_forcing::getWorkSpaceSize(kmcd);
 
 
-    problem_jac.computeJacobian(member, alpha, F);
+
+
 
   }
 
