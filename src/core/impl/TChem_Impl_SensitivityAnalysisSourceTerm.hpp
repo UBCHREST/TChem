@@ -55,7 +55,7 @@ struct SensitivityAnalysisSourceTerm
     const RealType1DViewType& vals, /// (kmcd.nSpec)
     const RealType1DViewType& alpha,
     // outputs
-    const RealType1DViewType& source,
+    const RealType1DViewType& source, // rhs 
     /// workspace
     const RealType1DViewType& facL,
     const RealType1DViewType& facF,
@@ -78,6 +78,12 @@ struct SensitivityAnalysisSourceTerm
                                        w,
                                        kmcd);
     member.team_barrier();
+
+    // Here
+
+
+
+
 
 
 

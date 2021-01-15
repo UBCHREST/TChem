@@ -157,8 +157,8 @@ struct ForcingMatrix_Problem
 
     #if defined(TCHEM_ENABLE_SERIAL_TEST_OUTPUT) && !defined(__CUDA_ARCH__)
         if (member.league_rank() == 0) {
-          FILE* fs = fopen("ForcingMatrix_Problem.team_invoke.test.out", "a+");
-          fprintf(fs, ":: ForcingMatrix_Problem::team_invoke\n");
+          FILE* fs = fopen("ForcingMatrix_Problem.test.out", "a+");
+          fprintf(fs, ":: ForcingMatrix_Problem\n");
           fprintf(fs, ":::: input\n");
           fprintf(fs,
                   "     nSpec %3d, nReac %3d, t %e, p %e\n",
@@ -167,7 +167,7 @@ struct ForcingMatrix_Problem
                   _temp,
                   _p);
           fprintf(fs, "x :: input\n");
-          for (ordinal_type sp = 1; sp < x.extent(0); sp++) {
+          for (ordinal_type sp = 0; sp < x.extent(0); sp++) {
             fprintf(fs,"i %d % e \n", sp, x(sp) );
           }
           fprintf(fs, "mass fraction :: input\n");

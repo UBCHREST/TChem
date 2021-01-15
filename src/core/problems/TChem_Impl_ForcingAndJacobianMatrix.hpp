@@ -98,30 +98,6 @@ struct ForcingAndJacobianMatrix
 
       problem_jac.computeJacobian(member, vals, L);
 
-
-
-      //computes jacobian
-        // {
-        //   const ordinal_type m = problem_jac.getNumberOfEquations();
-        //   /// _work is used for evaluating a function
-        //   /// f_0 and f_h should be gained from the tail
-        //   real_type* wptr = problem_jac._work.data() + (problem_jac._work.span() - 2 * m);
-        //   RealType1DViewType f_0(wptr, m);
-        //   wptr += f_0.span();
-        //   RealType1DViewType f_h(wptr, m);
-        //   wptr += f_h.span();
-        //
-        //   /// use the default values
-        //   const real_type fac_min(-1), fac_max(-1);
-        //   // NumericalJacobianForwardDifference::team_invoke_detail
-        //   //  (member, problem, fac_min, fac_max, fac, x, f_0, f_h, Jac);
-        //   // NumericalJacobianCentralDifference::team_invoke_detail(
-        //   //   member, problem, fac_min, fac_max, fac, x, f_0, f_h, Jac);
-        //   NumericalJacobianRichardsonExtrapolation::team_invoke_detail
-        //    (member, problem_jac, fac_min, fac_max, facL, vals, f_0, f_h, L);
-        //
-        //
-        // }
     }
 
     {
@@ -164,27 +140,6 @@ struct ForcingAndJacobianMatrix
 
       problem_forcing.computeJacobian(member, alpha, F);
 
-      // {
-      //   const ordinal_type m = problem_forcing.getNumberOfEquations();
-      //   /// _work is used for evaluating a function
-      //   /// f_0 and f_h should be gained from the tail
-      //   real_type* wptr = problem_forcing._work.data() + (problem_forcing._work.span() - 2 * m);
-      //   RealType1DViewType f_0(wptr, m);
-      //   wptr += f_0.span();
-      //   RealType1DViewType f_h(wptr, m);
-      //   wptr += f_h.span();
-      //
-      //   /// use the default values
-      //   const real_type fac_min(-1), fac_max(-1);
-      //   NumericalJacobianForwardDifference::team_invoke_detail
-      //    (member, problem_forcing, fac_min, fac_max, facF, alpha, f_0, f_h, F);
-      //   // NumericalJacobianCentralDifference::team_invoke_detail(
-      //   //   member, problem, fac_min, fac_max, fac, x, f_0, f_h, Jac);
-      //   // NumericalJacobianRichardsonExtrapolation::team_invoke_detail
-      //   //  (member, problem_forcing, fac_min, fac_max, facF, alpha, f_0, f_h, F);
-      //
-      //
-      // }
 
     }
 
