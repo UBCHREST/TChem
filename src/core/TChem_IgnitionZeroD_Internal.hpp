@@ -98,72 +98,77 @@ namespace TChem {
 	    const real_type t_beg = tadv_at_i._tbeg;
 	    
 	    const auto temperature = sv_at_i.Temperature();
-	    const auto pressure = sv_at_i.Pressure();
-	    const auto Ys = sv_at_i.MassFractions();
-	    
-	    const RealType0DViewType temperature_out(sv_out_at_i.TemperaturePtr());
-	    const RealType0DViewType pressure_out(sv_out_at_i.PressurePtr());
-	    const RealType1DViewType Ys_out = sv_out_at_i.MassFractions();
-	    const RealType0DViewType density_out(sv_out_at_i.DensityPtr());
-	    
-	    const ordinal_type m = kmcd_at_i.nSpec + 1;
-	    auto wptr = work.data();
-	    const RealType1DViewType vals(wptr, m);
-	    wptr += m;
-	    const RealType1DViewType ww(wptr,
-					work.extent(0) - (wptr - work.data()));
-	    
-	    /// we can only guarantee vals is contiguous array. we basically assume
-	    /// that a state vector can be arbitrary ordered.
-	    
-	    /// m is nSpec + 1
-	    Kokkos::parallel_for
-	      (Kokkos::TeamVectorRange(member, m),
-	       [&](const ordinal_type& i) {
-		 vals(i) = i == 0 ? temperature : Ys(i - 1);
-	       });
-	    member.team_barrier();
-	    
-	    using ignition_zeroD = Impl::IgnitionZeroD<ValueType,DeviceType>;
-	    
-	    ignition_zeroD
-	      ::team_invoke(member,
-			    jacobian_interval,
-			    max_num_newton_iterations,
-			    max_num_time_iterations,
-			    tol_newton,
-			    tol_time,
-			    fac_at_i,
-			    dt_in,
-			    dt_min,
-			    dt_max,
-			    t_beg,
-			    t_end,
-			    pressure,
-			    vals,
-			    t_out_at_i,
-			    dt_out_at_i,
-			    pressure_out,
-			    vals,
-			    ww,
-			    kmcd_at_i);
-	    
-	    member.team_barrier();
-	    Kokkos::parallel_for
-	      (Kokkos::TeamVectorRange(member, m),
-	       [&](const ordinal_type& i) {
-		 if (i == 0) {
-		   temperature_out() = vals(0);
-		 } else {
-		   Ys_out(i - 1) = vals(i);
-		 }
-	       });
-	    
-	    member.team_barrier();
-	    density_out() = Impl::RhoMixMs<real_type,DeviceType>
-	      ::team_invoke(member, temperature_out(),
-			    pressure_out(), Ys_out, kmcd_at_i);
-	    member.team_barrier();
+          if(temperature > 500) {
+
+              const auto pressure = sv_at_i.Pressure();
+              const auto Ys = sv_at_i.MassFractions();
+
+              const RealType0DViewType temperature_out(sv_out_at_i.TemperaturePtr());
+              const RealType0DViewType pressure_out(sv_out_at_i.PressurePtr());
+              const RealType1DViewType Ys_out = sv_out_at_i.MassFractions();
+              const RealType0DViewType density_out(sv_out_at_i.DensityPtr());
+
+              const ordinal_type m = kmcd_at_i.nSpec + 1;
+              auto wptr = work.data();
+              const RealType1DViewType vals(wptr, m);
+              wptr += m;
+              const RealType1DViewType ww(wptr,
+                                          work.extent(0) - (wptr - work.data()));
+
+              /// we can only guarantee vals is contiguous array. we basically assume
+              /// that a state vector can be arbitrary ordered.
+
+              /// m is nSpec + 1
+              Kokkos::parallel_for
+                      (Kokkos::TeamVectorRange(member, m),
+                       [&](const ordinal_type &i) {
+                           vals(i) = i == 0 ? temperature : Ys(i - 1);
+                       });
+              member.team_barrier();
+
+              using ignition_zeroD = Impl::IgnitionZeroD<ValueType, DeviceType>;
+
+              ignition_zeroD
+              ::team_invoke(member,
+                            jacobian_interval,
+                            max_num_newton_iterations,
+                            max_num_time_iterations,
+                            tol_newton,
+                            tol_time,
+                            fac_at_i,
+                            dt_in,
+                            dt_min,
+                            dt_max,
+                            t_beg,
+                            t_end,
+                            pressure,
+                            vals,
+                            t_out_at_i,
+                            dt_out_at_i,
+                            pressure_out,
+                            vals,
+                            ww,
+                            kmcd_at_i);
+
+              member.team_barrier();
+              Kokkos::parallel_for
+                      (Kokkos::TeamVectorRange(member, m),
+                       [&](const ordinal_type &i) {
+                           if (i == 0) {
+                               temperature_out() = vals(0);
+                           } else {
+                               Ys_out(i - 1) = vals(i);
+                           }
+                       });
+
+              member.team_barrier();
+              density_out() = Impl::RhoMixMs<real_type, DeviceType>
+              ::team_invoke(member, temperature_out(),
+                            pressure_out(), Ys_out, kmcd_at_i);
+              member.team_barrier();
+          }else{
+              Kokkos::deep_copy(sv_out_at_i, sv_at_i);
+          }
 	  }
 	}
       });
@@ -239,7 +244,6 @@ namespace TChem {
 	    const real_type t_beg = tadv_at_i._tbeg;
 	    
 	    const auto temperature = sv_at_i.Temperature();
-        if(temperature > 500){
 	    const auto pressure = sv_at_i.Pressure();
 	    const auto Ys = sv_at_i.MassFractions();
 	    
@@ -306,9 +310,6 @@ namespace TChem {
 	    density_out() = Impl::RhoMixMs<real_type,DeviceType>
 	      ::team_invoke(member, temperature_out(),
 			    pressure_out(), Ys_out, kmcd);
-        }else{
-
-        }
 	  }
 	}
       });
