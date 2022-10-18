@@ -98,7 +98,7 @@ namespace TChem {
 	    const real_type t_beg = tadv_at_i._tbeg;
 	    
 	    const auto temperature = sv_at_i.Temperature();
-          if(temperature > 500) {
+          if(temperature > 560) {
 
               const auto pressure = sv_at_i.Pressure();
               const auto Ys = sv_at_i.MassFractions();
