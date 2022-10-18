@@ -167,7 +167,7 @@ namespace TChem {
                             pressure_out(), Ys_out, kmcd_at_i);
               member.team_barrier();
           }else{
-              Kokkos::deep_copy(sv_out_at_i, sv_at_i);
+              Kokkos::deep_copy(state_out_at_i, state_at_i);
           }
 	  }
 	}
