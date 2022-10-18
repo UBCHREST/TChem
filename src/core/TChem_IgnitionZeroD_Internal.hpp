@@ -84,6 +84,7 @@ namespace TChem {
 	  
 	  Impl::StateVector<RealType1DViewType> sv_at_i(kmcd_at_i.nSpec, state_at_i);
 	  Impl::StateVector<RealType1DViewType> sv_out_at_i(kmcd_at_i.nSpec, state_out_at_i);
+      if(sv_out_at_i.)
 	  TCHEM_CHECK_ERROR(!sv_at_i.isValid(), "Error: input state vector is not valid");
 	  TCHEM_CHECK_ERROR(!sv_out_at_i.isValid(), "Error: input state vector is not valid");
 	  {
@@ -239,6 +240,7 @@ namespace TChem {
 	    const real_type t_beg = tadv_at_i._tbeg;
 	    
 	    const auto temperature = sv_at_i.Temperature();
+        if(temperature > 500){
 	    const auto pressure = sv_at_i.Pressure();
 	    const auto Ys = sv_at_i.MassFractions();
 	    
@@ -305,6 +307,9 @@ namespace TChem {
 	    density_out() = Impl::RhoMixMs<real_type,DeviceType>
 	      ::team_invoke(member, temperature_out(),
 			    pressure_out(), Ys_out, kmcd);
+        }else{
+
+        }
 	  }
 	}
       });
